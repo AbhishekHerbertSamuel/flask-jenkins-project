@@ -1,68 +1,59 @@
 pipeline {
-    agent any
+    agent {
+        docker { image 'node:alpine' } // Use a lightweight Node.js Docker image
+    }
 
     environment {
-        FLASK_APP = 'app.py'
-        FLASK_PORT = '5000'
-        VENV_DIR = 'venv'
+        APP_NAME = "NodeJS Jenkins App"
+        APP_VERSION = "1.0.0"
     }
 
     stages {
-        stage('Checkout Code') {
+        stage('Display Environment Variables') {
             steps {
                 script {
-                    git branch: 'main', url: 'https://github.com/AbhishekHerbertSamuel/flask-jenkins-project.git'
+                    echo "🔹 Application Name: ${APP_NAME}"
+                    echo "🔹 Application Version: ${APP_VERSION}"
                 }
             }
         }
 
-        stage('Setup Python Environment') {
+        stage('Setup Directory Structure') {
             steps {
-                sh '''
-                if [ ! -d "$VENV_DIR" ]; then
-                    python3 -m venv $VENV_DIR
-                fi
-                source $VENV_DIR/bin/activate
-                pip install --upgrade pip
-                pip install -r requirements.txt
-                '''
+                sh 'mkdir -p app'
+                sh 'ls -l'
             }
         }
 
-        stage('Stop Existing Flask App') {
+        stage('Generate Node.js File') {
             steps {
-                sh '''
-                FLASK_PID=$(lsof -t -i:$FLASK_PORT)
-                if [ ! -z "$FLASK_PID" ]; then
-                    echo "Stopping existing Flask app..."
-                    kill -9 $FLASK_PID
-                fi
-                '''
+                sh 'echo "console.log(\'Hello from Node.js!\');" > app/app.js'
             }
         }
 
-        stage('Run Flask Application') {
+        stage('Display Directory Contents') {
             steps {
-                sh '''
-                source $VENV_DIR/bin/activate
-                nohup python3 $FLASK_APP > flask.log 2>&1 &
-                '''
+                sh 'ls -l app/'
             }
         }
 
-        stage('Verify Flask App') {
+        stage('Run Node.js File') {
             steps {
-                sh '''
-                sleep 5
-                curl -I http://127.0.0.1:$FLASK_PORT || echo "Flask App is not running!"
-                '''
+                sh 'node app/app.js'
+            }
+        }
+
+        stage('Archive Build Output') {
+            steps {
+                archiveArtifacts artifacts: 'app/app.js', fingerprint: true
             }
         }
     }
 
     post {
         always {
-            archiveArtifacts artifacts: 'flask.log', fingerprint: true
+            echo "📌 Cleaning up workspace..."
+            cleanWs()
         }
     }
 }
